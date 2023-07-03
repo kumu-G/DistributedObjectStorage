@@ -1,0 +1,20 @@
+GET metadata/_search?q=hash:66WuRH0s0albWDZ9nTmjFo9JIqTTXmB6EiRkhTh1zeA=
+GET metadata/_search
+{
+	"size": 0,
+	"aggs": {
+	  "group_by_name": {
+  		"terms": {
+  		  "field": "name.raw",
+  		  "min_doc_count": 6
+  		},
+    	"aggs": {
+    	  "min_version": {
+    			"min": {
+    			  "field": "version"
+    			}
+    	  }
+    	}
+	  }
+	}
+}

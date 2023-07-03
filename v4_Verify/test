@@ -1,0 +1,33 @@
+
+# 获取 "this object will have only 1 instance" 的hash值
+echo -n "this object will have only 1 instance" | openssl dgst -sha256 -binary | base64
+echo -n "this object will have only 1 instance version 2" | openssl dgst -sha256 -binary | base64
+aWKQ2BipX94sb+h3xdTbWYAu1yzjn5vyFG2SOwUQIXY=
+SMz9wx9hrlfTmgZB0enAlDzjgPk98w0jJG1XGpFiV48=	version 2
+
+# PUT test4 版本1 -- 返回200
+curl -v 172.29.2.1:12345/objects/test4_1 -XPUT -d "this object will have only 1" -H "Digest: SHA-256=aWKQ2BipX94sb+h3xdTbWYAu1yzjn5vyFG2SOwUQIXY="
+
+curl -v 172.29.2.1:12345/objects/test4_1 -XPUT -d "this object will have only 1 instance version 2" -H "Digest: SHA-256=SMz9wx9hrlfTmgZB0enAlDzjgPk98w0jJG1XGpFiV48="
+
+
+# PUT test4 版本2 -- 返回200
+curl -v 172.29.2.1:12345/objects/test4_2 -XPUT -d "this object will have only 1 instance" -H "Digest: SHA-256=aWKQ2BipX94sb+h3xdTbWYAu1yzjn5vyFG2SOwUQIXY="
+
+# 定位查看该对象被保存在哪个数据服务节点上 -- 返回200ok "172.29.1.4:12345"
+curl -v 172.29.2.1:12345/locate/aWKQ2BipX94sb+h3xdTbWYAu1yzjn5vyFG2SOwUQIXY=
+
+# 定位不正确对象 -- 返回 404 not found
+curl -v 172.29.2.1:12345/locate/incorrecthash
+
+# 使用ls命令访问个数据节点的$STORAGE_ROOT/objects 目录 -- 返回200ok  '/tmp/4/objects/aWKQ2BipX94sb+h3xdTbWYAu1yzjn5vyFG2SOwUQIXY='
+ls /tmp/?/objects/aWKQ2BipX94sb+h3xdTbWYAu1yzjn5vyFG2SOwUQIXY\=
+
+# GET对象 -- 返回200ok  "this object will have 11 instance"
+curl -v 172.29.2.1:12345/objects/test4_1
+curl -v 172.29.2.1:12345/objects/test4_2
+
+# 尝试PUT一个散列值不正确的对象 -- 返回 400Bad Request
+curl -v 172.29.2.1:12345/objects/test4_1 -XPUT -d "this object will have only 1 instance" -H "Digest: SHA-256=incorrecthash"
+
+

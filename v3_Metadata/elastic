@@ -1,0 +1,108 @@
+
+
+# 安装 elasticsearch 和 kibana
+
+# 把 elasticsearch 和 kibana 绑定在 docker 定义的同一网络下，就能实现网络互通
+docker network create elastic 同一网络下通信
+
+# 安装 elasticsearch
+# *****
+
+# -d 后台运行
+# --name elasticsearch —— 修改容器名字为 elasticsearch
+# --network elastic  —— 绑定在 docker 的 elastic 网络中
+# -p 9200:9200 -p 9300:9300 —— 开放容器内9200和9300端口
+#  -e ES_JAVA_OPTS="-Xms512m -Xmx512m"  —— 设置elastic最大最小内存
+# -e "discovery.type=single-node" —— 设置为“单点模式”（ES的默认启动方式是集群模式，对新手不友好）
+# -e "xpack.security.enabled=false" —— 关闭默认的HTTPS请求，启动HTTP请求
+docker run -d --name elasticsearch --network elastic -p 9200:9200 -p 9300:9300 -e ES_JAVA_OPTS="-Xms512m -Xmx512m" -e "discovery.type=single-node" -e "xpack.security.enabled=false" -t elasticsearch:8.7.0
+
+# 如果没有加入-e "xpack.security.enabled=false"选项，则需手动查找并修改
+# 切换为root用户，进入 docker容器目录/var/lib/docker/overlay2
+find .|xargs grep -ri "xpack.security.enabled" -l
+# *****
+
+# 安装 kibana
+# *****
+
+# -d 后台运行
+# --name kibana —— 修改容器名字为 kibana
+#  -m 300M —— 设置容器最大启动内存为300M（!若启动失败可删除重建容器，并去掉该选项 或将数值调高）
+# --network elastic  —— 绑定在 docker 的 elastic 网络中
+# -i, —— interactive Keep STDIN open even if not attached —— 即使未连接STDIN（标准输入）也保持打开状态，分配一个交互终端
+# -t, —— tty Allocate a pseudo-TTY —— 表示容器启动后会进入其命令行，与it一起使用。分配一个伪tty设备,可以支持终端登录
+# -it 针对纯操作系统镜像（没有守护进程的）在docker run的时候需要加-it参数，否则启动后会自动退出
+docker run -d --name kibana -m 300M -p 5601:5601 --network elastic -it kibana:8.7.0
+# *****
+
+
+# 测试elasticsearch指令
+# mappings映射
+curl 172.29.158.120:9200/metadata -XPUT -H 'Content-Type: application/json'  -d '{"mappings": {"properties":{"name":{ "type":"text", "index":false },"version":{"type":"binary"},"size":{"type":"binary"}, "hash":{"type":"text"} }}}'
+
+# 通过 name_id新建对象
+curl 172.29.158.120:9200/metadata/_doc/abc_1?op_type=create -XPUT  -H 'Content-Type: application/json' -d '{"name":"abc","version":1,"size":20,"hash":"eerereraafwe"}'
+
+# ES指令
+
+# mappings
+PUT metadata
+{
+  "mappings": {
+      "properties":{
+        "name":{
+          "type":"text"
+        },
+        "version":{
+          "type":"integer"
+        },
+        "size":{
+          "type":"integer"
+        },
+        "hash":{
+          "type":"text"
+        }
+      }
+    }
+}
+GET metadata/_mapping
+DELETE metadata
+
+# 通过name_version作为id创建 —— PutMetadata
+PUT metadata/_doc/abc_1?op_type=create
+{
+  "name":"abc",
+  "version":1,
+  "size":20,
+  "hash":"yyyyyyyyyy"
+}
+PUT metadata/_doc/abc_2?op_type=create
+{
+  "name":"abc",
+  "version":2,
+  "size":20,
+  "hash":"uuuuu"
+}
+PUT metadata/_doc/def_1?op_type=create
+{
+  "name":"def",
+  "version":1,
+  "size":20,
+  "hash":"ffffffffffff"
+}
+GET metadata/_source/abc_2
+GET metadata/_doc/abc_1
+
+# 找到对应name的最新版本 size指定分页  ——
+GET metadata/_search?q=name:abc&size=1&sort=version:desc
+# 找到对应name的全部版本 form/size指定分页 —— SearchAllVersion
+GET metadata/_search?sort=version:desc&from=0&size=5&q=name:abc
+GET metadata/_search
+
+# SearchLatestVersion 搜索最近的版本
+GET metadata/_search?q=name:abc&size=1&sort=version:desc
+DELETE metadata/_doc/abc_1
+
+
+
+

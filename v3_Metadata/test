@@ -1,0 +1,34 @@
+书本P69
+# 没有附带digest请求头，直接发送test3版本1 - 返回请求404
+curl -v 172.29.2.1:12345/objects/test3 -XPUT  -d "this is object test3" -H "Content-Type: application/json"
+
+# 生成test3版本1的base64形式digest
+echo -n "this is object test3" | openssl dgst -sha256 -binary | base64
+Digest如下
+GYqqAdFPt+CScnUDc0/Gcu3kwcWmOADKNYpiZtdbgsM=
+# 重新发送test3版本1
+curl -v 172.29.2.2:12345/objects/test3 -XPUT -d "this is object test3" -H "Digest: SHA-256=GYqqAdFPt+CScnUDc0/Gcu3kwcWmOADKNYpiZtdbgsM=" -H "Content-Type: application/json"
+
+# 生成test3版本2的base64形式digest
+echo -n "this is object test3 version 2" | openssl dgst -sha256 -binary | base64
+# Digest如下
+cAPvsxZe1PR54zIESQy0BaxC1pYJIvaHSF3qEOZYYIo=
+# 发送版本2
+curl -v 172.29.2.2:12345/objects/test3 -XPUT -d "this is object test3 version2" -H "Digest:SHA-256=cAPvsxZe1PR54zIESQy0BaxC1pYJIvaHSF3qEOZYYIo=" -H "Content-Type: application/json"
+
+# 定位test3版本1
+curl -v 172.29.2.1:12345/locate/GYqqAdFPt+CScnUDc0/Gcu3kwcWmOADKNYpiZtdbgsM= -H "Content-Type: application/json"
+# 定位test3版本2
+curl -v 172.29.2.1:12345/locate/cAPvsxZe1PR54zIESQy0BaxC1pYJIvaHSF3qEOZYYIo= -H "Content-Type: application/json"
+
+# 定位test3所有版本
+curl -v 172.29.2.1:12345/versions/test3 -H "Content-Type: application/json"
+# 查看内容test3版本1
+curl -v 172.29.2.1:12345/objects/test3?version=1 -H "Content-Type: application/json"
+# 查看内容test3最新版本
+curl -v 172.29.2.1:12345/objects/test3 -H "Content-Type: application/json"
+
+# 删除test3
+curl -v 172.29.2.1:12345/objects/test3 -XDELETE -H "Content-Type: application/json"
+# 检验test是否删除完毕， 返回404
+curl -v 172.29.2.1:12345/objects/test3 -H "Content-Type: application/json"

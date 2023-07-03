@@ -1,0 +1,41 @@
+
+# 生成test5对象的hash值
+echo -n "this object will be separate to 4+2 shards" | openssl dgst -sha256 -binary | base64
+MBMxWHrPMsuOBaVYHkwScZQRyTRMQyiKp2oelpLZza8=
+
+#  新建test5对象 -- 返回200ok， 服务器节点上存在 xxx文件
+curl -v 172.29.2.1:12345/objects/test5 -XPUT -d"this object will be separate to 4+2 shards" -H "Digest: SHA-256=MBMxWHrPMsuOBaVYHkwScZQRyTRMQyiKp2oelpLZza8="
+
+# 检查6个分片是否都已正确上传
+ls /tmp/?/objects
+# 返回
+# /tmp/x/objects: xxx
+# /tmp/x/objects: xxx
+# ...
+
+# 查看对象test5如何被分片
+cat /tmp/1/objects/MBMxWHrPMsuOBaVYHkwScZQRyTRMQyiKp2oelpLZza8\=.0.XVFHp5%2F5kZ89051XQo6UEkWW8OGzyXwLWS4Ln9f0Ncg=
+cat /tmp/x/objects/MBMxWHrPMsuOBaVYHkwScZQRyTRMQyiKp2oelpLZza8\=.1.xx
+cat /tmp/x/objects/MBMxWHrPMsuOBaVYHkwScZQRyTRMQyiKp2oelpLZza8\=.4.xx
+
+# 查看test5	-- 返回内容
+curl -v 172.29.2.1:12345/objects/test5
+# 定位test5	-- 返回  "0":"地址"; ..."6":"地址"
+curl -v 172.29.2.1:12345/locate/MBMxWHrPMsuOBaVYHkwScZQRyTRMQyiKp2oelpLZza8\=
+
+# 删除分片0
+rm /tmp/x0/objects/MBMxWHrPMsuOBaVYHkwScZQRyTRMQyiKp2oelpLZza8\=.0.xx
+# 修改分片1的内容
+echo some_garbage > /tmp/x1/objects/MBMxWHrPMsuOBaVYHkwScZQRyTRMQyiKp2oelpLZza8\=.1.xx
+# 查看是否能恢复	-- 返回 "this object ...."
+curl -v 172.29.2.2:12345/objects/test5
+
+# 再次检查数据节点上x0和x1的内容
+ls /tmp/?/objects
+cat /tmp/x0/objects/MBMxWHrPMsuOBaVYHkwScZQRyTRMQyiKp2oelpLZza8\=.0.xx
+cat /tmp/x1/objects/MBMxWHrPMsuOBaVYHkwScZQRyTRMQyiKp2oelpLZza8\=.1.xx
+# 可以看到分片0和分片1的数据已经被成功修复
+
+# 加入破坏了3个及以上的分片，对象已无法正常读取，返回404
+
+

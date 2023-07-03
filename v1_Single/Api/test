@@ -1,0 +1,11 @@
+#text 测试功能
+
+# 添加对象test2，内容为"this is object test2"
+curl -v 172.29.2.1:12345/objects/test2 -XPUT -d"this is object test2"
+
+# 定位对象test2 -- 返回服务器地址 "x.x.x.x:xx"
+curl -v 172.29.2.1:12345/locate/test2
+
+# 查看对象test2内容 -- 返回内容 "this is object test2"
+curl -v 172.29.2.1:12345/objects/test2
+

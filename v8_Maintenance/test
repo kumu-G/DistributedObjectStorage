@@ -1,0 +1,60 @@
+# 生成garbage目录
+for i in `seq 1 6`; do mkdir -p /tmp/$1/garbage; done
+
+# 先给test8对象上传6个版本
+echo -n "this is object test8 version 1" | openssl dgst -sha256 -binary | base64
+2IJQkIth94IVsnPQMrsNxz1oqfrsPo0E2ZmZfJLDZnE=
+curl -v 172.29.2.1:12345/objects/test8 -XPUT -d"this is object test8 version 1" -H "Digest: SHA-256=2IJQkIth94IVsnPQMrsNxz1oqfrsPo0E2ZmZfJLDZnE="
+
+echo -n "this is object test8 version 2-6" | openssl dgst -sha256 -binary | base64
+66WuRH0s0albWDZ9nTmjFo9JIqTTXmB6EiRkhTh1zeA=
+curl 172.29.2.1:12345/objects/test8 -XPUT -d"this is object test8 version 2-6" -H "Digest: SHA-256=66WuRH0s0albWDZ9nTmjFo9JIqTTXmB6EiRkhTh1zeA="
+curl -v 172.29.2.1:12345/objects/test8 -XPUT -d"this is object test8 version 2-6" -H "Digest: SHA-256=66WuRH0s0albWDZ9nTmjFo9JIqTTXmB6EiRkhTh1zeA="
+curl -v 172.29.2.1:12345/objects/test8 -XPUT -d"this is object test8 version 2-6" -H "Digest: SHA-256=66WuRH0s0albWDZ9nTmjFo9JIqTTXmB6EiRkhTh1zeA="
+curl -v 172.29.2.1:12345/objects/test8 -XPUT -d"this is object test8 version 2-6" -H "Digest: SHA-256=66WuRH0s0albWDZ9nTmjFo9JIqTTXmB6EiRkhTh1zeA="
+curl -v 172.29.2.1:12345/objects/test8 -XPUT -d"this is object test8 version 2-6" -H "Digest: SHA-256=66WuRH0s0albWDZ9nTmjFo9JIqTTXmB6EiRkhTh1zeA="
+
+# 用versions接口检查test8当前的版本，共有6个
+curl 172.29.2.1:12345/versions/test8
+
+# ls命令查看磁盘上的对象文件
+ls -l /tmp/?/objects
+
+# 运行deleteOldMetada工具
+go run Api/maintance/deleteOldMetadata/deleteOldMetada.go
+
+# 再次检查test8当前版本 -- 版本1已被删除
+curl 172.29.2.1:12345/versions/test8
+
+# 分别在6个数据服务节点上运行deleteOrphanObject工具
+STORAGE_ROOT=/tmp/1 LISTEN_ADDRESS=172.29.1.1:12345 go run Api/maintance/deleteOrphanObject/deleteOrphanObject.go
+STORAGE_ROOT=/tmp/2 LISTEN_ADDRESS=172.29.1.2:12345 go run Api/maintance/deleteOrphanObject/deleteOrphanObject.go
+STORAGE_ROOT=/tmp/3 LISTEN_ADDRESS=172.29.1.3:12345 go run Api/maintance/deleteOrphanObject/deleteOrphanObject.go
+STORAGE_ROOT=/tmp/4 LISTEN_ADDRESS=172.29.1.4:12345 go run Api/maintance/deleteOrphanObject/deleteOrphanObject.go
+STORAGE_ROOT=/tmp/5 LISTEN_ADDRESS=172.29.1.5:12345 go run Api/maintance/deleteOrphanObject/deleteOrphanObject.go
+STORAGE_ROOT=/tmp/6 LISTEN_ADDRESS=172.29.1.6:12345 go run Api/maintance/deleteOrphanObject/deleteOrphanObject.go
+# 2IJQkIth94IVsnPQMrsNxz1oqfrsPo0E2ZmZfJLDZnE=这个散列值的数据节点已经被全部删除
+
+# 查看目录的变化
+ls -l /tmp/?/objects
+ls -l /tmp/?/garbage
+
+# 测试数据修复
+rm /tmp/1/objects/66WuRH0s0albWDZ9nTmjFo9JIqTTXmB6EiRkhTh1zeA=.*
+echo some_garbage > /tmp/2/objects/66WuRH0s0albWDZ9nTmjFo9JIqTTXmB6EiRkhTh1zeA=.*
+ls -l /tmp/?/objects
+# 删除并破坏了一个分片
+
+# 选择一个数据节点的仓库，运行objectScanner工具
+STORAGE_ROOT=/tmp/2 go run Api/maintance/objectScanner/objectScanner.go
+
+# 检查修复
+ls -l /tmp/?/objects
+
+# 如果超过两个分片被破坏
+echo some_garbage > /tmp/1/objects/66WuRH0s0albWDZ9nTmjFo9JIqTTXmB6EiRkhTh1zeA=.*
+echo some_garbage > /tmp/2/objects/66WuRH0s0albWDZ9nTmjFo9JIqTTXmB6EiRkhTh1zeA=.*
+echo some_garbage > /tmp/3/objects/66WuRH0s0albWDZ9nTmjFo9JIqTTXmB6EiRkhTh1zeA=.*
+# 对象将无法修复
+STORAGE_ROOT=/tmp/2 go run Api/maintance/objectScanner/objectScanner.go
+ls -l /tmp/?/objects

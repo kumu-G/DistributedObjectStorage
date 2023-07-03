@@ -1,0 +1,26 @@
+
+# 生成一个100MB的测试文件，其中数据都填0
+dd if=/dev/zero of=/tmp/file bs=1M count=100
+# 生成散列值
+openssl dgst -sha256 -binary /tmp/file | base64
+IEkqTQ2E+L6xdn9mFiKfhdRMKCe2S9v7Jg7hL6EQng4=
+
+# 将这个文件上传为test7对象
+curl -v 172.29.2.1:12345/objects/test7 -XPUT --data-binary @/tmp/file -H "Digest: SHA-256=IEkqTQ2E+L6xdn9mFiKfhdRMKCe2S9v7Jg7hL6EQng4="
+
+# 查看分片对象的大小（IE指散列值）
+ls -ltr /tmp/?/objects/IE*
+# 如果不使用数据压缩，一个100MB对象的4+2分片分别是25MB，但压缩后每个分片大小为25KB
+
+# 下载test对象 -- 看到下载的数据有100MB
+curl -v 172.29.2.1:12345/objects/test7 -o /tmp/output
+# 对比数据 -- 返回 Files /tmp/output and /tmp/file are identical
+diff -s /tmp/output /tmp/file
+
+# 现在以gzip压缩的方式下载数据 -- 压缩数据只有99KB，格式是gzip
+curl -v 172.29.2.1:12345/objects/test7 -H "Accept-Encoding: gzip" -o /tmp/output2.gz
+
+# 压缩数据
+gunzip /tmp/output2.gz
+# 对比数据 -- 返回 Files /tmp/output2 and /tmp/file are identical
+diff -s /tmp/output2 /tmp/file
